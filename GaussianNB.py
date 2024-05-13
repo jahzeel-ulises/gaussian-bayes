@@ -1,4 +1,5 @@
 import numpy as np
+import warnings
 
 def _validate_data(X,y)->bool:
     """
@@ -17,7 +18,6 @@ def _validate_data(X,y)->bool:
     -------------------
     Exception: List, pandas data frame or numpy array expected
     """
-    
     #Check the data to be list, pandas data frame or numpy array
     try:
          X_c = np.array(X)
@@ -35,6 +35,9 @@ def _validate_data(X,y)->bool:
     if len(y_c.shape) != 1 and (y_c.shape[0] != 1 and y_c.shape[1] != 1):
         raise Exception("Unidimensional array on y expected")
     
+    if len(y_c.shape) != 1:
+        warnings.warn("Data conversion warning, y shape expected (n_samples,) but vector column received")
+        flag = True
     #Checks number of classes(minimum 2)
     if len(np.unique(y_c)) < 2:
         raise Exception("At least 2 classes needed")
@@ -44,7 +47,6 @@ class GaussianNB():
     """
     def __init__(self) -> None:
         pass
-
     
     def _split_data(self,X,y)->dict:
         """
@@ -63,15 +65,41 @@ class GaussianNB():
         dict:
             Dictionary with matrix group by classes.
         """
-        self.classes_ = np.unique(y)
+        X_c = np.array(X)
         y_c = np.ravel(y)
-        matrix = dict()
+        classes = np.unique(y)
+        splited_data = dict()
         for _ in range(X.shape[0]):
             try:
-                matrix[y[_]] = np.hstack((matrix[y[_]],X[_,:]))
+                splited_data[y_c[_]] = np.hstack((splited_data[y_c[_]],X_c[_,:]))
             except:
-                matrix[y[_]] = X[_,:]
-        return matrix
+                splited_data[y_c[_]] = X_c[_,:]
+        return splited_data,classes
+
+    def _calculate_classes_statics(self,splited_data:dict):
+        """
+        Generate descriptive statistics of each class.
+
+        Parameters
+        -----------------
+        splited_data: dict
+            Dictionary with the arrays separated by class.
+        
+        Returns
+        -----------------
+        dict:
+            Dictionary with the descriptors of each class.
+
+            Ex: {"1":{"mu":1,"sigma":0}}
+        """
+
+        classes_statics_ = dict()
+        for class_ in self.classes_:
+            mu = np.mean(splited_data[class_],axis=0)
+            sigma = np.std(splited_data[class_],axis=0)
+            classes_statics_[class_] = {"mu":mu,"sigma":sigma}
+        
+        return classes_statics_
 
 
     def fit(self,X,y):
@@ -91,4 +119,8 @@ class GaussianNB():
         self:
             Fitted estimator.
         """
+        _validate_data(X,y)
+
+        splited_data,self.classes_ = self._split_data(X,y)
+        self.classes_statics_ = self._calculate_classes_statics(splited_data)
         return self
