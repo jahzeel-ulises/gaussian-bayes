@@ -1,7 +1,7 @@
 import numpy as np
 import warnings
 
-def _validate_data(X,y)->bool:
+def _validate_data(X,y)->None:
     """
     Checks data input to be correct.
     
@@ -12,11 +12,17 @@ def _validate_data(X,y)->bool:
 
     Returns
     -------------------
-    bool
+    None
 
     Raises
     -------------------
     Exception: List, pandas data frame or numpy array expected
+    Exception: 2D array like on X expected
+    Exception: Unidimensional array on y expected
+    Exception: Data conversion warning, y shape expected (n_samples,) but vector column received
+    Exception: At least 2 classes needed
+    Exception: X's n_sample != y'n n_sample
+
     """
     #Check the data to be list, pandas data frame or numpy array
     try:
@@ -44,15 +50,16 @@ def _validate_data(X,y)->bool:
     
     #Checks X _samples same y n_samples
     y_c = np.ravel(y_c)
-    if X_c.shape[0] != y_c[0]:
+    if X_c.shape[0] != y_c.shape[0]:
         raise Exception("X's n_sample != y'n n_sample")
 
     
 class GaussianNB():
     """
     """
-    def __init__(self,priors:dict = None) -> None:
+    def __init__(self,priors:dict = None,var_smoothing=1e-9) -> None:
         self.priors_ = priors
+        self.var_smoothing_ = var_smoothing
     
     def _split_data(self,X,y)->dict:
         """
@@ -77,7 +84,7 @@ class GaussianNB():
         splited_data = dict()
         for _ in range(X.shape[0]):
             try:
-                splited_data[y_c[_]] = np.hstack((splited_data[y_c[_]],X_c[_,:]))
+                splited_data[y_c[_]] = np.vstack((splited_data[y_c[_]],X_c[_,:]))
             except:
                 splited_data[y_c[_]] = X_c[_,:]
         return splited_data,classes
@@ -95,6 +102,11 @@ class GaussianNB():
         ----------------
         dict
             Python dictionary with priors probabilities.
+
+        Raises
+        --------------
+        Exception: Dict in priors expected
+        Exception: Class in priors not in training set
         """
         #If priors set in constructor validates priors are in y
         if self.priors_:
@@ -133,8 +145,8 @@ class GaussianNB():
 
         classes_statics_ = dict()
         for class_ in self.classes_:
-            mu = np.mean(splited_data[class_],axis=0)
-            sigma = np.std(splited_data[class_],axis=0)
+            mu = np.mean(splited_data[class_],axis=0,dtype=np.float64)
+            sigma = np.var(splited_data[class_],axis=0,dtype=np.float64,ddof=1) + self.epsilon_
             classes_statics_[class_] = {"mu":mu,"sigma":sigma}
         
         return classes_statics_
@@ -157,9 +169,9 @@ class GaussianNB():
         numpy.ndarray
             Array with the normal distribution values of the entries.
         """
-        return (1/(sigma*np.sqrt(2*np.pi))) * np.exp(-0.5*((X-mean)/sigma)**2)
+        return (1/((np.sqrt(sigma))*np.sqrt(2*np.pi))) * np.exp(-0.5*((X-mean)**2/np.sqrt(sigma)))
     
-    def _sum_of_logs(self,X):
+    def _sum_of_logs(self,X,mean,sigma):
         """
         Calculates the value of the sum of log of entries in X.
 
@@ -171,15 +183,27 @@ class GaussianNB():
         Returns
         -----------------
         numpy.ndarray
-            Array with the log values of the entries.
+            Scalar variable with the sum of logs values.
         """
-        X_c = np.log(X)
-        return np.sum(X_c)
+      
+        logs = -0.5*np.log(sigma*2*np.pi) - 0.5*(((X - mean))**2/sigma)
+        return np.sum(logs)
     
     def _product_of_likelihood(self,X):
-        return np.prod(X)
-    
+        """
+        Calculates the product of likelihood values.
 
+        Parameters
+        ----------------
+        X : {array-like} of shape (n_features,)
+            Training vector 'n_features' is the number of features.
+        
+        Returns
+        ----------------
+        numpy.ndarray
+            Scalar variable with probability of be on certein class.
+        """
+        return np.prod(X)
     def predict_proba(self,X):
         """
         Predict probabilities of be in one class.
@@ -250,13 +274,33 @@ class GaussianNB():
         for class_ in self.classes_:
             mean = self.classes_statics_[class_]["mu"]
             sigma = self.classes_statics_[class_]["sigma"]
-            norm_dist = np.apply_along_axis(self._normal_dist,1,X_c,mean,sigma)
-            logs = np.apply_along_axis(self._sum_of_logs,1,norm_dist)
+            logs = np.apply_along_axis(self._sum_of_logs,1,X_c,mean,sigma)
             logs = logs + np.log(self.priors_[class_])
             pred = np.vstack((pred,logs))
         pred = pred.T
 
         return np.apply_along_axis(self._get_classes,1,pred)
+
+    def score(self,X,y):
+        """
+        Calculates the accuracy of the model.
+        
+        Parameters
+        -------------
+        X : {array-like, sparse matrix} of shape (n_samples, n_features)
+            Testing vector, where `n_samples` is the number of samples and
+            `n_features` is the number of features.
+        y : array-like of shape (n_samples,)
+            Target vector relative to X.
+        
+        Returns
+        ------------
+        float
+            Accuracy value in [0,1]
+        """
+        y_pred = self.predict(X)
+        pred_v_real = y == y_pred
+        return np.count_nonzero(pred_v_real)/pred_v_real.shape[0]
 
     def fit(self,X,y):
         """
@@ -277,6 +321,7 @@ class GaussianNB():
         """
         _validate_data(X,y)
 
+        self.epsilon_ = self.var_smoothing_ * np.var(X, axis=0).max()
         self.feature_size_ = np.array(X).shape[1]
         splited_data,self.classes_ = self._split_data(X,y)
         self.classes_statics_ = self._calculate_classes_statics(splited_data)
