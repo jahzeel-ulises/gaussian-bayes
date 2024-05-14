@@ -42,11 +42,17 @@ def _validate_data(X,y)->bool:
     if len(np.unique(y_c)) < 2:
         raise Exception("At least 2 classes needed")
     
+    #Checks X _samples same y n_samples
+    y_c = np.ravel(y_c)
+    if X_c.shape[0] != y_c[0]:
+        raise Exception("X's n_sample != y'n n_sample")
+
+    
 class GaussianNB():
     """
     """
-    def __init__(self) -> None:
-        pass
+    def __init__(self,priors:dict = None) -> None:
+        self.priors_ = priors
     
     def _split_data(self,X,y)->dict:
         """
@@ -75,6 +81,38 @@ class GaussianNB():
             except:
                 splited_data[y_c[_]] = X_c[_,:]
         return splited_data,classes
+    
+    def _calculate_priors(self,y)->dict:
+        """
+        Calculates the priors probability, if set in constructor, validates it.
+
+        Parameters
+        -----------------
+        y : array-like of shape (n_samples,)
+            Target vector relative to X.
+        
+        Returns
+        ----------------
+        dict
+            Python dictionary with priors probabilities.
+        """
+        #If priors set in constructor validates priors are in y
+        if self.priors_:
+            if type(self.priors_) != dict:
+                raise Exception("Dict in priors expected")
+
+            for class_ in self.classes_:
+                if class_ not in self.priors:
+                    raise Exception("Class in priors not in training set")
+            return self.priors_
+
+        y_c = np.ravel(y)
+
+        priors = dict()
+        for class_ in self.classes_:
+            priors[class_] = np.count_nonzero(y_c == class_)/y_c.shape[0]
+        return priors
+            
 
     def _calculate_classes_statics(self,splited_data:dict):
         """
@@ -101,6 +139,124 @@ class GaussianNB():
         
         return classes_statics_
 
+    def _normal_dist(self,X ,mean,sigma):
+        """
+        Calculates the value of X entries in the normal distribution.
+
+        Parameters
+        -----------------
+        X : {array-like} of shape (n_features,)
+            Training vector `n_features` is the number of features.
+        mean : {array-like} of shape (n_features,)
+            Vector with mu values of each feature for a especific class.
+        sigma : {array-like} of shape (n_features,)
+            Vector with sigma values of each feature for a especific class.
+        
+        Returns
+        -----------------
+        numpy.ndarray
+            Array with the normal distribution values of the entries.
+        """
+        return (1/(sigma*np.sqrt(2*np.pi))) * np.exp(-0.5*((X-mean)/sigma)**2)
+    
+    def _sum_of_logs(self,X):
+        """
+        Calculates the value of the sum of log of entries in X.
+
+        Parameters
+        -----------------
+        X : {array-like} of shape (n_features,)
+            Training vector `n_features` is the number of features.
+        
+        Returns
+        -----------------
+        numpy.ndarray
+            Array with the log values of the entries.
+        """
+        X_c = np.log(X)
+        return np.sum(X_c)
+    
+    def _product_of_likelihood(self,X):
+        return np.prod(X)
+    
+
+    def predict_proba(self,X):
+        """
+        Predict probabilities of be in one class.
+
+        Parameters
+        -----------------
+        X : {array-like, sparse matrix} of shape (n_samples, n_features)
+            Training vector, where `n_samples` is the number of samples and
+            `n_features` is the number of features.
+        
+        Returns
+        -----------------
+        ndarray: {array-like} of shape (n_samples,n_classes)
+               Result vector, where 'n_samples' is the number of samples and 
+               'n_classes' is the number of the classes.
+        """
+        X_c = np.array(X)
+
+        if X_c.shape[1] != self.feature_size_:
+            raise Exception("X with shape (n_sample,n_features) expected")
+
+        proba = np.empty((0,X_c.shape[0]))
+        for class_ in self.classes_:
+            mean = self.classes_statics_[class_]["mu"]
+            sigma = self.classes_statics_[class_]["sigma"]
+            norm_dist = np.apply_along_axis(self._normal_dist,1,X_c,mean,sigma)
+            likelihood = np.apply_along_axis(self._product_of_likelihood,1,norm_dist)
+            likelihood = self.priors_[class_]*likelihood
+            proba = np.vstack((proba,likelihood))
+        return proba.T
+    
+    def _get_classes(self,X):
+        """
+        Return the class of the max probability index.
+
+        Parameters
+        ---------------
+        X: {array-like} with the probability of the class.
+
+        Retuns
+        ---------------
+        object:
+            Class of the 
+        """
+        return self.classes_[np.argmax(X)]
+
+    def predict(self,X):
+        """
+        Return the class of the max-prob index.
+
+        Parameters
+        ----------------
+        X:{array-like} of shape (n_features,)
+            Array with the probabilities of each class.
+        
+        Returns
+        ----------------
+        ndarray:
+            Array with the predicted classes.
+
+        """
+        X_c = np.array(X)
+
+        if X_c.shape[1] != self.feature_size_:
+            raise Exception("X with shape (n_sample,n_features) expected")
+        
+        pred = np.empty((0,X_c.shape[0]))
+        for class_ in self.classes_:
+            mean = self.classes_statics_[class_]["mu"]
+            sigma = self.classes_statics_[class_]["sigma"]
+            norm_dist = np.apply_along_axis(self._normal_dist,1,X_c,mean,sigma)
+            logs = np.apply_along_axis(self._sum_of_logs,1,norm_dist)
+            logs = logs + np.log(self.priors_[class_])
+            pred = np.vstack((pred,logs))
+        pred = pred.T
+
+        return np.apply_along_axis(self._get_classes,1,pred)
 
     def fit(self,X,y):
         """
@@ -121,6 +277,8 @@ class GaussianNB():
         """
         _validate_data(X,y)
 
+        self.feature_size_ = np.array(X).shape[1]
         splited_data,self.classes_ = self._split_data(X,y)
         self.classes_statics_ = self._calculate_classes_statics(splited_data)
+        self.priors_ = self._calculate_priors(y)
         return self
