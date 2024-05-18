@@ -56,8 +56,34 @@ def _validate_data(X,y)->None:
     
 class GaussianNB():
     """
+    Gaussian Naive Bayes (GaussianNB).
+
+    Parameters
+    --------------
+    priors: dict
+        Prior probabilities of the classes.
+    var_smoothing: float, default = 1e-9
+        Portion of the largest variance of all features that is added to all
+        variances to avoid numeric errors.
+
+    Atributes
+    -------------
+    self.epsilon_: float
+        Value added to the variances.
+
+    self.feature_size_: int
+        Number of features seen in the fit.
+    
+    self.classes_: array-like
+        Class labels.
+
+    self.classes_statics_: dict
+        Dictionary with the variances and means of each class.
+
+    self.priors_ : dict
+        Probability of each class.
     """
-    def __init__(self,priors:dict = None,var_smoothing=1e-9) -> None:
+    def __init__(self,priors:dict = None,var_smoothing=1e-8) -> None:
         self.priors_ = priors
         self.var_smoothing_ = var_smoothing
     
