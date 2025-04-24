@@ -31,38 +31,49 @@ print(clf.predict([[-0.8, -1]]))
 *Parameters*
 
 priors: dict
-    Prior probabilities of the classes.
+
+Prior probabilities of the classes.
 
 var_smoothing: float, default = 1e-9
-    Portion of the largest variance of all features that is added to all
-    variances to avoid numeric errors.
+    
+Portion of the largest variance of all features that is added to all
+variances to avoid numeric errors.
 
 *Atributes*
+
 self.epsilon_: float
-    Value added to the variances.
+
+Value added to the variances.
 
 self.feature_size_: int
-    Number of features seen in the fit.
+
+Number of features seen in the fit.
     
 self.classes_: array-like
-    Class labels.
+
+Class labels.
 
 self.classes_statics_: dict
-    Dictionary with the variances and means of each class.
+
+Dictionary with the variances and means of each class.
 
 self.priors_ : dict
-    Probability of each class.
+
+Probability of each class.
 
 
 **predict_proba(self,X)**:
+
 Predict probabilities of be in one class.
 
 *Parameters*
+
 X : {array-like, sparse matrix} of shape (n_samples, n_features)
     Training vector, where `n_samples` is the number of samples and
     `n_features` is the number of features.
         
 *Returns*
+
 ndarray: {array-like} of shape (n_samples,n_classes)
         Result vector, where 'n_samples' is the number of samples and 
         'n_classes' is the number of the classes.
@@ -72,38 +83,49 @@ ndarray: {array-like} of shape (n_samples,n_classes)
 Return the class of the max-prob index.
 
 *Parameters*
+
 X:{array-like} of shape (n_features,)
     Array with the probabilities of each class.
         
 *Returns*
+
 ndarray:
+    
     Array with the predicted classes.
 
 **fit(self,X,y)**:
+
 Fit the model according to the given training data.
 
 *Parameters*
+
 X : {array-like, sparse matrix} of shape (n_samples, n_features)
     Training vector, where `n_samples` is the number of samples and
     `n_features` is the number of features.
+
 y : array-like of shape (n_samples,)
     Target vector relative to X.
         
 *Returns*
+
 self:
     Fitted estimator. 
 
 **score(self,X,y)**:
+
 Calculates the accuracy of the model.
         
 *Parameters*
+
 X : {array-like, sparse matrix} of shape (n_samples, n_features)
     Testing vector, where `n_samples` is the number of samples and
     `n_features` is the number of features.
+
 y : array-like of shape (n_samples,)
     Target vector relative to X.
         
 *Returns*
+
 float:
     Accuracy value in [0,1]
        
