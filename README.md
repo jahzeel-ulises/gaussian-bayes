@@ -91,7 +91,7 @@ X:{array-like} of shape (n_features,)
 
 ndarray:
     
-    Array with the predicted classes.
+Array with the predicted classes.
 
 **fit(self,X,y)**:
 
